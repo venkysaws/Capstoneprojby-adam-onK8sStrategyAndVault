@@ -1,0 +1,14 @@
+---
+ kind: Service
+ apiVersion: v1
+ metadata:
+   name: mongodbsvcactive
+   labels:
+     app: mongodb
+ spec:
+   ports:
+     - port: 27017
+       targetPort: 27017
+   selector:
+     app: mongodb
+   type: NodePort

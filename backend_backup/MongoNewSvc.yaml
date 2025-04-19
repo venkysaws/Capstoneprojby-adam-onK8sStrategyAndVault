@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mongodbpreviewservice
+spec:
+  selector:
+    app: mongodb
+  ports:
+   - port: 27017
+     protocol: TCP
+     targetPort: 27017
+  type: NodePort
