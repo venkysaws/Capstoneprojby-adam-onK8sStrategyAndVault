@@ -1,0 +1,65 @@
+kind: Rollout
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: canary-demo
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: canary-demo
+  revisionHistoryLimit: 1
+  template:
+    metadata:
+      labels:
+        app: canary-demo
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-status: "update"
+        vault.hashicorp.com/role: "wezvatech-admin"
+        vault.hashicorp.com/agent-inject-secret-database-config.txt: "internal/data/database/config"
+        vault.hashicorp.com/agent-inject-template-database-config.txt:
+         vault.hashicorp.com/agent-inject-template-database-config.txt: |
+          {{- with secret "internal/data/database/config" -}}
+          postgres://{{ .Data.data.username }}:{{ .Data.data.password }}@postgres:5432/wizard
+          {{- end -}}
+
+    spec:
+      serviceAccountName: wezvatech-admin
+      containers:
+        initContainers:
+          - name: init-mydb
+            image: busybox:1.28
+            command: ['sh', '-c', "until nslookup mongo-svc.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done"]
+        containers: 
+          - name: canary-demo
+            image: adamtravis/rollouts:blue
+            imagePullPolicy: always
+            ports:
+              - name: http
+                containerPort: 8080
+                protocol: TCP
+            resources:
+              requests:
+                memory: 42Mi
+                cpu: 5m
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app 
+                    operator: In
+                    values: 
+                      - mongo
+  strategy:
+    canary:
+      canaryService: appsvcpreviewsvc
+      steps:
+        - setWeight: 20
+        - pause: {}
+        - setWeight: 30
+        - pause: {duration: 30}
+        - setWeight: 40
+        - pause: {duration: 30}
+        - setWeight: 50
+        - pause: {duration: 80}     
