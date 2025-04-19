@@ -1,0 +1,86 @@
+kind: Rollout
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  labels:
+    app: mongodb
+  name: mongodb
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: mongo
+  strategy:
+    bluegreen:
+      autoPromotionEnabled: false
+      activeService: mongodbsvcactive
+      previewService: mongodbpreviewservice
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              matchExpressions:
+                - key: servertype
+                  operator: In
+                  values:
+                    - large
+      containers:
+        - name: mongo
+          image: mongo
+          args: ["-dbpath","/data/db"]
+          ports:
+            - containerPort: 27017
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - 'db.runCommand("ping").ok'
+                - --quiet
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - 'db.runCommand("ping").ok'
+                - --quiet
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 6
+          env:
+            - name: MONGO-INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongoDBCreds
+                  value: username
+            - name: MONGO-INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongoDBCreds
+                  value: password
+          volumeMounts:
+            name: mongo-data-dir
+            mountPath: /data/db
+      volumes:
+        - name: mongo-data-dir
+          PersistentVolumeClaim: 
+            claimName: "mongopvc"
+          
+          
+     
+                 
+           
+            
+                
